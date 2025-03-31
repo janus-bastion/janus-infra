@@ -3,7 +3,7 @@
 
 services:
   janus-nginx1:
-    image: nginx:latest
+    image: nginx:alpine
     container_name: janus-nginx1
     depends_on:
       - janus-php
