@@ -1,0 +1,75 @@
+---
+# version: '3.8'
+
+services:
+  janus-nginx1:
+    image: nginx:alpine
+    container_name: janus-nginx1
+    volumes:
+      - ../janus-frontend/janus-website:/usr/share/nginx/html:z
+      - ../janus-frontend/janus-conf-nginx:/etc/nginx/conf.d:z
+    ports:
+      - "8081:80"
+    depends_on:
+      - janus-php
+    restart: always
+    healthcheck:
+      test: ["CMD", "ping", "-c", "1", "127.0.0.1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - "no-new-privileges=true"
+    networks:
+      - janus-prod-net
+
+  janus-php:
+    image: php:fpm
+    container_name: janus-php
+    restart: always
+    healthcheck:
+      test: ["CMD", "ping", "-c", "1", "127.0.0.1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    volumes:
+      - ../janus-frontend/janus-website:/usr/share/nginx/html:z
+    ports:
+      - "9000:9000"
+    security_opt:
+      - "no-new-privileges=true"
+    networks:
+      - janus-prod-net
+
+  janus-mysql:
+    image: mysql:latest
+    container_name: janus-mysql
+    restart: always
+    healthcheck:
+      test: ["CMD", "ping", "-c", "1", "127.0.0.1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydatabase
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+      MYSQL_REPLICATION_USER: repl_user
+      MYSQL_REPLICATION_PASSWORD: repl_password
+      # command: --server-id=1 --log-bin=mysql-bin --binlog-do-db=mydatabase
+    security_opt:
+      - "no-new-privileges=true"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - janus-prod-net
+
+networks:
+  janus-prod-net:
+
+volumes:
+  mysql_data:
