@@ -10,36 +10,6 @@ services:
     networks:
       - janus-prod-net
 
-  janus-nginx2:
-    image: nginx:latest
-    container_name: janus-nginx2
-    depends_on:
-      - janus-php
-    networks:
-      - janus-prod-net
-
-  janus-nginx3:
-    image: nginx:latest
-    container_name: janus-nginx3
-    depends_on:
-      - janus-php
-    networks:
-      - janus-prod-net
-
-  janus-haproxy:
-    image: haproxy:latest
-    container_name: janus-haproxy
-    volumes:
-      - .haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:z
-    ports:
-      - "80:80"
-    depends_on:
-      - janus-nginx1
-      - janus-nginx2
-      - janus-nginx3
-    networks:
-      - janus-prod-net
-
   janus-php:
     image: php:fpm
     container_name: janus-php
@@ -56,36 +26,9 @@ services:
       MYSQL_PASSWORD: password
       MYSQL_REPLICATION_USER: repl_user
       MYSQL_REPLICATION_PASSWORD: repl_password
-        # command: --server-id=1 --log-bin=mysql-bin --binlog-do-db=mydatabase
+      # command: --server-id=1 --log-bin=mysql-bin --binlog-do-db=mydatabase
     volumes:
       - mysql_data:/var/lib/mysql
-    networks:
-      - janus-prod-net
-
-  janus-mysql-slave:
-    image: mysql:latest
-    container_name: janus-mysql-slave
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_REPLICATION_USER: repl_user
-      MYSQL_REPLICATION_PASSWORD: repl_password
-        # command: --server-id=2 --relay-log=mysql-relay-bin --log-bin=mysql-bin
-    depends_on:
-      - janus-mysql
-    volumes:
-      - mysql_slave_data:/var/lib/mysql
-    networks:
-      - janus-prod-net
-
-  janus-portainer:
-    image: portainer/portainer-ce
-    container_name: janus-portainer
-    restart: always
-    ports:
-      - "9000:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
     networks:
       - janus-prod-net
 
@@ -94,5 +37,3 @@ networks:
 
 volumes:
   mysql_data:
-  mysql_slave_data:
-  portainer_data:
