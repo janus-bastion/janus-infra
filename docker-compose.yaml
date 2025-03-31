@@ -7,6 +7,9 @@ services:
     container_name: janus-nginx1
     volumes:
       - ../janus-frontend/janus-website:/usr/share/nginx/html:z
+      - ../janus-frontend/janus-conf-nginx:/etc/nginx/conf.d:z
+    ports:
+      - "8081:80"
     depends_on:
       - janus-php
     networks:
@@ -17,6 +20,8 @@ services:
     container_name: janus-php
     volumes:
       - ../janus-frontend/jabys-website:/usr/share/nginx/html:z
+    ports:
+      - "9000:9000"
     networks:
       - janus-prod-net
 
