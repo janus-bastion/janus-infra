@@ -5,6 +5,8 @@ services:
   janus-nginx1:
     image: nginx:alpine
     container_name: janus-nginx1
+    volumes:
+      - ../janus-frontend/janus-website:/usr/share/nginx/html:z
     depends_on:
       - janus-php
     networks:
@@ -13,6 +15,8 @@ services:
   janus-php:
     image: php:fpm
     container_name: janus-php
+    volumes:
+      - ../janus-frontend/jabys-website:/usr/share/nginx/html:z
     networks:
       - janus-prod-net
 
