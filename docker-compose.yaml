@@ -8,6 +8,7 @@ services:
     volumes:
       - ../janus-frontend/janus-website:/usr/share/nginx/html:z
       - ../janus-frontend/janus-conf-nginx:/etc/nginx/conf.d:z
+      - ../janus-frontend/janus-db-connect:/home/janus-storage/janus-db-connect:z
     ports:
       - "8081:80"
     depends_on:
@@ -25,7 +26,7 @@ services:
       - janus-prod-net
 
   janus-php:
-    image: php:fpm
+    image: imtjanus/janus-php:8.2-fpm
     container_name: janus-php
     restart: always
     healthcheck:
@@ -36,6 +37,7 @@ services:
       start_period: 5s
     volumes:
       - ../janus-frontend/janus-website:/usr/share/nginx/html:z
+      - ../janus-frontend/janus-db-connect:/home/janus-storage/janus-db-connect:z
     ports:
       - "9000:9000"
     security_opt:
@@ -54,17 +56,17 @@ services:
       retries: 3
       start_period: 5s
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: mydatabase
-      MYSQL_USER: user
-      MYSQL_PASSWORD: password
-      MYSQL_REPLICATION_USER: repl_user
-      MYSQL_REPLICATION_PASSWORD: repl_password
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: janus_db
+      MYSQL_USER: janus
+      MYSQL_PASSWORD: janus
       # command: --server-id=1 --log-bin=mysql-bin --binlog-do-db=mydatabase
-    security_opt:
-      - "no-new-privileges=true"
+    #security_opt:
+    #- "no-new-privileges=true"
     volumes:
       - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
     networks:
       - janus-prod-net
 
