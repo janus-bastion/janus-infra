@@ -65,6 +65,7 @@ services:
     #- "no-new-privileges=true"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./janus-db:/docker-entrypoint-initdb.d
     ports:
       - "3306:3306"
     networks:
