@@ -1,4 +1,4 @@
----
+
 # version: '3.8'
 
 services:
@@ -9,8 +9,10 @@ services:
       - ../janus-frontend/janus-website:/usr/share/nginx/html:z
       - ../janus-frontend/janus-conf-nginx:/etc/nginx/conf.d:z
       - ../janus-frontend/janus-db-connect:/home/janus-storage/janus-db-connect:z
+      - ../janus-infra/janus-certs:/etc/nginx/certs:z
     ports:
-      - "8081:80"
+   #  - "8081:80"
+      - "8443:443"
     depends_on:
       - janus-php
     restart: always
