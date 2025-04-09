@@ -2,6 +2,20 @@
 # version: '3.8'
 
 services:
+  janus-haproxy:
+    image: haproxy:latest
+    volumes:
+      - ../janus-infra/janus-haproxy:/usr/local/etc/haproxy:z
+      - ../janus-infra/janus-certs:/usr/local/certs:z
+    ports:
+      - "8445:8445"
+    container_name: janus-haproxy
+    depends_on:
+      - janus-nginx1
+      - janus-nginx2
+    networks:
+      - janus-prod-net
+
   janus-nginx1:
     image: nginx:alpine
     container_name: janus-nginx1
@@ -26,6 +40,31 @@ services:
       - "no-new-privileges=true"
     networks:
       - janus-prod-net
+
+  janus-nginx2:
+      image: nginx:alpine
+      container_name: janus-nginx2
+      volumes:
+        - ../janus-frontend/janus-website:/usr/share/nginx/html:z
+        - ../janus-frontend/janus-conf-nginx:/etc/nginx/conf.d:z
+        - ../janus-frontend/janus-db-connect:/home/janus-storage/janus-db-connect:z
+        - ../janus-infra/janus-certs:/etc/nginx/certs:z
+      ports:
+     #  - "8081:80"
+        - "8444:443"
+      depends_on:
+        - janus-php
+      restart: always
+      healthcheck:
+        test: ["CMD", "ping", "-c", "1", "127.0.0.1"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 5s
+      security_opt:
+        - "no-new-privileges=true"
+      networks:
+        - janus-prod-net
 
   janus-php:
     image: imtjanus/janus-php:8.2-fpm
