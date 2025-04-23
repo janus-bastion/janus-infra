@@ -26,6 +26,6 @@ CREATE TABLE IF NOT EXISTS remote_connections (
     port INT,
     username VARCHAR(100) NOT NULL,
     password VARCHAR(255),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
