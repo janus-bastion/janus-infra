@@ -62,12 +62,9 @@ services:
       MYSQL_DATABASE: janus_db
       MYSQL_USER: janus
       MYSQL_PASSWORD: janus
-      # command: --server-id=1 --log-bin=mysql-bin --binlog-do-db=mydatabase
-    #security_opt:
-    #- "no-new-privileges=true"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./janus-db:/docker-entrypoint-initdb.d
+      - ./janus-db:/docker-entrypoint-initdb.d/:z
     ports:
       - "3306:3306"
     networks:
