@@ -1,4 +1,4 @@
-name: Grype Scan on All Docker Compose Images
+name: Grype Scan on All docker compose Images
 
 on:
   push:
