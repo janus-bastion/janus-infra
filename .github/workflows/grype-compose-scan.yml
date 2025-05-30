@@ -1,0 +1,39 @@
+name: Grype Scan on All Docker Compose Images
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  scan-all-images:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Pull all images from docker compose file
+        run: |
+          docker compose -f janus-compose.yaml pull
+
+      - name: Extract image list from compose file
+        id: list_images
+        run: |
+          echo "IMAGES<<EOF" >> $GITHUB_ENV
+          docker compose -f janus-compose.yaml config | grep 'image:' | awk '{ print $2 }' | sort -u >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Scan each image with Grype
+        run: |
+          echo "$IMAGES" | while read image; do
+            echo "Scanning $image"
+            grype "$image" --fail-on critical || echo "::warning ::Vulnerabilities found in $image"
+          done
