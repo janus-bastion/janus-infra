@@ -38,7 +38,7 @@ services:
     security_opt:
       - "no-new-privileges=true"
     networks:
-      - janus-prod-net
+      - janus-prod-net 
 
   janus-nginx2:
       image: nginx:alpine
