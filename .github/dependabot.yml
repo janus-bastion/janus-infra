@@ -1,10 +1,11 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/"  # chemin du requirements.txt
+  - package-ecosystem: "docker"
+    directory: "/"  # S'il y a un Dockerfile à la racine du repo
     schedule:
       interval: "daily"
+
   - package-ecosystem: "docker"
-    directory: "/"  # Dockerfile
+    directory: "/janus-infra"  # Pour le Dockerfile de ton infra
     schedule:
       interval: "daily"
