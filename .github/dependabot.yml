@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"  # chemin du requirements.txt
+    schedule:
+      interval: "daily"
+  - package-ecosystem: "docker"
+    directory: "/"  # Dockerfile
+    schedule:
+      interval: "daily"
