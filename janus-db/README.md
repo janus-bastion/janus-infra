@@ -1,107 +1,107 @@
-# Réplication de Base de Données Janus
+# Janus Database Replication Janus
 
-Cette solution implémente une réplication
+This solution implements database replication.
 
-## Vue d'ensemble
+## Overview
 
-Le système réplique automatiquement toutes les modifications de la base de données principale vers une instance secondaire. L'architecture repose sur :
+The system automatically replicates all changes from the primary database to a secondary instance. The architecture relies on:
 
-- Détection automatique des changements via triggers MySQL
-- Synchronisation événementielle avec table de logs
-- Gestion transparente des nouvelles tables
-- Interface unifiée via un script shell unique
+- Automatic change detection via MySQL triggers
+- Event-driven synchronization using a log table
+- Transparent management of new tables
+- Unified interface through a single shell script
 
-**Composants principaux :**
-- Script de gestion : `janus-replication.sh`
-- Base source : conteneur `janus-mysql` (port 3306)
-- Base réplique : conteneur `janus-mysql-replica` (port 3307)
+**Main components:**
+- Management script: `janus-replication.sh`
+- Source database: container `janus-mysql` (port 3306)
+- Replica database: container `janus-mysql-replica` (port 3307)
 
-### Mise en route
+### Getting Started
 
-2. **Initialiser la réplication**
+2. **Initialize replication**
    ```bash
    cd janus-db
    chmod +x janus-replication.sh
    ./janus-replication.sh setup
    ```
 
-3. **Vérifier l'installation**
+3. **Verify installation**
    ```bash
    ./janus-replication.sh status
    ```
 
-4. **Activer la synchronisation continue**
+4. **Enable continuous synchronization**
    ```bash
    ./janus-replication.sh auto-sync
    ```
 
-## Utilisation
+## Usage
 
-### Commandes principales
+### Main commands
 
-**Configuration initiale**
+**Initial setup**
 ```bash
 ./janus-replication.sh setup
 ```
-Configure les conteneurs et installe les triggers sur toutes les tables existantes.
+Configures the containers and installs triggers on all existing tables.
 
-**Synchronisation**
+**Synchronization**
 ```bash
-# Synchronisation ponctuelle
+# One-time synchronization
 ./janus-replication.sh sync
 
-# Synchronisation continue (arrêt avec Ctrl+C)
+# Continuous synchronization (stop with Ctrl+C)
 ./janus-replication.sh auto-sync
 ```
 
-**Gestion des sauvegardes**
+**Backup management**
 ```bash
-# Sauvegarde avec nom automatique
+# Backup with automatic name
 ./janus-replication.sh backup
 
-# Sauvegarde nommée
-./janus-replication.sh backup nom_sauvegarde
+# Named backup
+./janus-replication.sh backup backup_name
 
-# Restauration
-./janus-replication.sh restore fichier_sauvegarde.sql.gz
+# Restore
+./janus-replication.sh restore backup_file.sql.gz
 ```
 
 **Monitoring**
 ```bash
-# État détaillé du système
+# Detailed system status
 ./janus-replication.sh status
 
-# Nettoyage complet
+# Full cleanup
 ./janus-replication.sh cleanup
 ```
 
 ## Configuration
 
-### Variables d'environnement
+### Environment variables
 
-Le fichier `.env` permet de personnaliser la configuration :
+
+The `.env` file allows customization of the configuration:
 
 ```bash
 cp .env.example .env
 ```
 
-**Paramètres disponibles :**
+**Available parameters:**
 ```bash
-# Base de données source
+# Source database
 SOURCE_CONTAINER=janus-mysql
 SOURCE_USER=root
 SOURCE_PASSWORD=root
 SOURCE_DB=janus_db
 
-# Base de données réplique
+# Replica database
 TARGET_CONTAINER=janus-mysql-replica
 TARGET_USER=root
 TARGET_PASSWORD=replica_password
 TARGET_DB=janus_db
 
-# Intervalle de synchronisation (secondes)
+# Synchronization interval (seconds)
 SYNC_INTERVAL=10
 ```
 
-La base réplique est créée automatiquement lors du premier `setup` si elle n'existe pas.
-
+The replica database is automatically created during the first `setup` if it does not exist.
