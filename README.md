@@ -4,7 +4,7 @@
 
 <div align="center">
   <a href="https://github.com/janus-bastion">
-    <img src="https://github.com/janus-bastion/janus-frontend/blob/main/janus-website/janus-logo.png" alt="Janus Bastion Logo" width="160" height="160" />
+    <img src="https://github.com/janus-bastion/janus-frontend/blob/main/public/janus-logo.png" alt="Janus Bastion Logo" width="160" height="160" />
   </a>
 
   <p><em>The infrastructure orchestrator of the Janus project. It deploys and manages the bastion’s containers, services, and configurations using docker and GitHub Actions.
