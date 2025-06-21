@@ -23,6 +23,7 @@ services:
       - ../janus-frontend/janus-conf-nginx:/etc/nginx/conf.d:z
       - ../janus-frontend/janus-db-connect:/home/janus-storage/janus-db-connect:z
       - ../janus-infra/janus-certs:/etc/nginx/certs:z
+      - ../janus-frontend/public:/usr/share/nginx/html/slim:z
     ports:
    #  - "8081:80"
       - "8443:443"
@@ -48,6 +49,7 @@ services:
         - ../janus-frontend/janus-conf-nginx:/etc/nginx/conf.d:z
         - ../janus-frontend/janus-db-connect:/home/janus-storage/janus-db-connect:z
         - ../janus-infra/janus-certs:/etc/nginx/certs:z
+        - ../janus-frontend/public:/usr/share/nginx/html/slim:z
       ports:
      #  - "8081:80"
         - "8444:443"
@@ -78,6 +80,8 @@ services:
     volumes:
       - ../janus-frontend/janus-website:/usr/share/nginx/html:z
       - ../janus-frontend/janus-db-connect:/home/janus-storage/janus-db-connect:z
+      - ../janus-frontend/public:/usr/share/nginx/html/slim:z
+      - ../janus-frontend/composer:/usr/share/nginx/composer:z
     ports:
       - "9000:9000"
     security_opt:
