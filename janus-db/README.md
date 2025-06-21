@@ -1,7 +1,7 @@
 # Janus Database Replication Janus
 
 This solution implements database replication.
-
+ 
 ## Overview
 
 The system automatically replicates all changes from the primary database to a secondary instance. The architecture relies on:
