@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Janus Database Replication Manager
-# Single script to manage Janus database replication
+# Unified script to manage Janus database replication
 # Usage: ./janus-replication.sh <command> [options]
 
 set -e
@@ -20,7 +20,7 @@ TARGET_DB="${TARGET_DB:-janus_db}"
 SYNC_INTERVAL="${SYNC_INTERVAL:-10}"
 CHANGE_LOG_TABLE="replication_log"
 
-# Colors
+# Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -34,28 +34,28 @@ show_help() {
     echo "Usage: $0 <command> [options]"
     echo ""
     echo "Available commands:"
-    echo "  setup              - Initial setup (triggers + replica container)"
-    echo "  sync               - One-time manual sync"
-    echo "  auto-sync          - Continuous automatic sync"
-    echo "  backup [name]      - Quick database backup"
-    echo "  restore <file>     - Restore from a backup file"
+    echo "  setup              - Initial configuration (triggers + replica container)"
+    echo "  sync               - One-time manual synchronization"
+    echo "  auto-sync          - Continuous automatic synchronization"
+    echo "  backup [name]      - Quick backup"
+    echo "  restore <file>     - Restore a backup file"
     echo "  status             - Show replication status"
-    echo "  cleanup            - Remove triggers and log table"
-    echo "  help               - Show this help message"
+    echo "  cleanup            - Remove triggers and replication log table"
+    echo "  help               - Show this help"
     echo ""
     echo "Optional environment variables:"
     echo "  SOURCE_CONTAINER   - Source container (default: janus-mysql)"
     echo "  TARGET_CONTAINER   - Target container (default: janus-mysql-replica)"
-    echo "  SYNC_INTERVAL      - Sync interval in seconds (default: 10)"
+    echo "  SYNC_INTERVAL      - Synchronization interval in seconds (default: 10)"
     echo ""
     echo "Examples:"
-    echo "  $0 setup                    # Complete setup"
-    echo "  $0 auto-sync               # Start auto-sync"
+    echo "  $0 setup                    # Full setup"
+    echo "  $0 auto-sync               # Start automatic sync"
     echo "  $0 backup my_backup        # Create a backup"
-    echo "  $0 status                  # Check current status"
+    echo "  $0 status                  # Check sync status"
 }
 
-# Execute a MySQL command in a container
+# Execute MySQL command in container
 mysql_exec() {
     local container=$1
     local user=$2
@@ -66,14 +66,14 @@ mysql_exec() {
     docker exec "$container" mysql -u "$user" -p"$password" "$database" -e "$query" 2>/dev/null
 }
 
-# Check source and target containers
+# Check Docker containers
 check_containers() {
     if ! docker ps | grep -q "$SOURCE_CONTAINER"; then
         echo -e "${RED}Source container '$SOURCE_CONTAINER' not found${NC}"
         exit 1
     fi
 
-    if ! docker ps -a --format "{{.Names}}" | grep -q "^$TARGET_CONTAINER$"; then
+    if ! docker ps -a --format "table {{.Names}}" | grep -q "^$TARGET_CONTAINER$"; then
         echo -e "${YELLOW}Creating target container '$TARGET_CONTAINER'...${NC}"
         docker run -d \
             --name "$TARGET_CONTAINER" \
@@ -82,7 +82,7 @@ check_containers() {
             -p 3307:3306 \
             mysql:latest
 
-        echo -e "${YELLOW}Waiting for MySQL to initialize...${NC}"
+        echo -e "${YELLOW}Waiting for MySQL to start...${NC}"
         sleep 30
 
         for i in {1..30}; do
@@ -118,7 +118,7 @@ install_triggers() {
 
     echo "Detected tables:"
     echo "$TABLES" | while read table; do
-        echo "  - $table"
+        echo "   - $table"
     done
 
     echo "$TABLES" | while read table; do
@@ -163,22 +163,22 @@ install_triggers() {
         fi
     done
 
-    echo -e "${GREEN}Triggers installed successfully${NC}"
+    echo -e "${GREEN}Triggers successfully installed${NC}"
 }
 
-# Synchronize data
+# Sync function
 sync_data() {
     local mode=${1:-"manual"}
 
     if [ "$mode" = "auto" ]; then
-        echo -e "${BLUE}Starting automatic synchronization${NC}"
+        echo -e "${BLUE}Automatic synchronization started${NC}"
         echo "Press Ctrl+C to stop"
         trap 'echo -e "\nStopping synchronization..."; exit 0' INT TERM
     fi
 
     while true; do
         if [ "$mode" = "auto" ]; then
-            echo "Checking for changes... $(date '+%H:%M:%S')"
+            echo "Checking... $(date '+%H:%M:%S')"
         fi
 
         local changes
@@ -198,7 +198,7 @@ sync_data() {
             mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "UPDATE $CHANGE_LOG_TABLE SET synced = TRUE WHERE synced = FALSE;"
 
             rm -f "$TEMP_FILE"
-            echo -e "${GREEN}Synchronization completed${NC}"
+            echo -e "${GREEN}Synchronization complete${NC}"
 
             local source_count target_count
             source_count=$(mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "SELECT COUNT(*) FROM users;" | tail -1)
@@ -206,9 +206,9 @@ sync_data() {
             echo "Users - Source: $source_count, Target: $target_count"
         else
             if [ "$mode" = "auto" ]; then
-                echo "No changes to sync"
+                echo "No changes"
             else
-                echo -e "${GREEN}No changes to synchronize${NC}"
+                echo -e "${GREEN}No changes to sync${NC}"
             fi
         fi
 
