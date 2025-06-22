@@ -1,20 +1,23 @@
 CREATE DATABASE IF NOT EXISTS janus_db;
 USE janus_db;
 
--- Table des utilisateurs
 CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(100) NOT NULL UNIQUE,
-    email VARCHAR(150) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    totp_code VARCHAR(6) DEFAULT NULL,
-    totp_expires_at DATETIME DEFAULT NULL,
-    is_admin BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    username         VARCHAR(100)  NOT NULL UNIQUE,
+    email            VARCHAR(150)  NOT NULL UNIQUE,
+    password         VARCHAR(255)  NOT NULL,
+    totp_code        VARCHAR(6)    DEFAULT NULL,
+    totp_expires_at  DATETIME      DEFAULT NULL,
+    is_admin         BOOLEAN       NOT NULL DEFAULT 0,
+    created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Utilisateur admin par défaut
-INSERT IGNORE INTO users (username, email, password, is_admin)
+INSERT IGNORE INTO users (
+    username,
+    email,
+    password,
+    is_admin
+)
 VALUES (
     'janusadmin',
     'janusadmin@janus.fr',
@@ -22,25 +25,95 @@ VALUES (
     TRUE
 );
 
--- Table des connexions distantes
 CREATE TABLE IF NOT EXISTS remote_connections (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    protocol ENUM('ssh', 'vnc', 'rdp') NOT NULL,
-    host VARCHAR(255) NOT NULL,
-    port INT,
-    username VARCHAR(100) NOT NULL,
-    password VARCHAR(255),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    user_id    INT           NOT NULL,
+    name       VARCHAR(100)  NOT NULL,
+    protocol   ENUM('ssh', 'vnc', 'rdp') NOT NULL,
+    host       VARCHAR(255)  NOT NULL,
+    port       INT,
+    username   VARCHAR(100)  NOT NULL,
+    password   VARCHAR(255),
+    created_at TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) 
+        REFERENCES users(id) 
+        ON DELETE CASCADE
 );
 
--- Table des droits d’accès aux connexions
 CREATE TABLE IF NOT EXISTS connection_access (
-    user_id INT NOT NULL,
-    connection_id INT NOT NULL,
-    PRIMARY KEY (user_id, connection_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (connection_id) REFERENCES remote_connections(id) ON DELETE CASCADE
+    user_id        INT NOT NULL,
+    connection_id  INT NOT NULL,
+    PRIMARY KEY    (user_id, connection_id),
+    FOREIGN KEY    (user_id) 
+        REFERENCES users(id) 
+        ON DELETE CASCADE,
+    FOREIGN KEY    (connection_id) 
+        REFERENCES remote_connections(id) 
+        ON DELETE CASCADE
+);
+
+CREATE TABLE hosts (
+    id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    hostname     VARCHAR(255) NOT NULL UNIQUE,
+    ip_addr      VARBINARY(16),
+    description  TEXT,
+    created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_host (hostname, ip_addr)
+);
+
+CREATE TABLE services (
+    id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    host_id   BIGINT UNSIGNED NOT NULL,
+    proto     ENUM('SSH', 'RDP', 'VNC', 'TELNET', 'HTTPS') NOT NULL,
+    port      SMALLINT UNSIGNED NOT NULL,
+    UNIQUE KEY uniq_srv (host_id, proto, port),
+    FOREIGN KEY (host_id)
+        REFERENCES hosts(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE access_rules (
+    user_id     BIGINT UNSIGNED NOT NULL,
+    service_id  BIGINT UNSIGNED NOT NULL,
+    allow       BOOLEAN         NOT NULL DEFAULT 1,
+    created_at  TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, service_id),
+    FOREIGN KEY (user_id) 
+        REFERENCES users(id) 
+        ON DELETE CASCADE,
+    FOREIGN KEY (service_id) 
+        REFERENCES services(id) 
+        ON DELETE CASCADE
+);
+
+CREATE TABLE credentials (
+    id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id      BIGINT UNSIGNED NOT NULL,
+    service_id   BIGINT UNSIGNED NOT NULL,
+    cred_type    ENUM('SSH_KEY', 'PASSWORD', 'CERTIFICATE') NOT NULL,
+    secret_enc   BLOB        NOT NULL,
+    valid_from   DATETIME    NULL,
+    valid_to     DATETIME    NULL,
+    UNIQUE KEY uniq_cred (user_id, service_id, cred_type),
+    FOREIGN KEY (user_id) 
+        REFERENCES users(id) 
+        ON DELETE CASCADE,
+    FOREIGN KEY (service_id) 
+        REFERENCES services(id) 
+        ON DELETE CASCADE
+);
+
+CREATE TABLE sessions (
+    id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id      BIGINT UNSIGNED NOT NULL,
+    service_id   BIGINT UNSIGNED NOT NULL,
+    started_at   DATETIME        NOT NULL,
+    ended_at     DATETIME        NULL,
+    outcome      ENUM('SUCCESS', 'FAILURE', 'INTERRUPTED') NOT NULL,
+    log_path     VARCHAR(512)    NULL,
+    FOREIGN KEY (user_id)
+        REFERENCES users(id),
+    FOREIGN KEY (service_id)
+        REFERENCES services(id)
 );
