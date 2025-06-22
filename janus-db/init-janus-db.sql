@@ -52,8 +52,8 @@ CREATE TABLE IF NOT EXISTS connection_access (
         ON DELETE CASCADE
 );
 
-CREATE TABLE hosts (
-    id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS hosts (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
     hostname     VARCHAR(255) NOT NULL UNIQUE,
     ip_addr      VARBINARY(16),
     description  TEXT,
@@ -62,9 +62,9 @@ CREATE TABLE hosts (
     UNIQUE KEY uniq_host (hostname, ip_addr)
 );
 
-CREATE TABLE services (
-    id        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    host_id   BIGINT UNSIGNED NOT NULL,
+CREATE TABLE IF NOT EXISTS services (
+    id        INT AUTO_INCREMENT PRIMARY KEY,
+    host_id   INT NOT NULL,
     proto     ENUM('SSH', 'RDP', 'VNC', 'TELNET', 'HTTPS') NOT NULL,
     port      SMALLINT UNSIGNED NOT NULL,
     UNIQUE KEY uniq_srv (host_id, proto, port),
@@ -73,9 +73,9 @@ CREATE TABLE services (
         ON DELETE CASCADE
 );
 
-CREATE TABLE access_rules (
-    user_id     BIGINT UNSIGNED NOT NULL,
-    service_id  BIGINT UNSIGNED NOT NULL,
+CREATE TABLE IF NOT EXISTS access_rules (
+    user_id     INT NOT NULL,
+    service_id  INT NOT NULL,
     allow       BOOLEAN         NOT NULL DEFAULT 1,
     created_at  TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, service_id),
@@ -87,10 +87,10 @@ CREATE TABLE access_rules (
         ON DELETE CASCADE
 );
 
-CREATE TABLE credentials (
-    id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id      BIGINT UNSIGNED NOT NULL,
-    service_id   BIGINT UNSIGNED NOT NULL,
+CREATE TABLE IF NOT EXISTS credentials (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NOT NULL,
+    service_id   INT NOT NULL,
     cred_type    ENUM('SSH_KEY', 'PASSWORD', 'CERTIFICATE') NOT NULL,
     secret_enc   BLOB        NOT NULL,
     valid_from   DATETIME    NULL,
@@ -104,10 +104,10 @@ CREATE TABLE credentials (
         ON DELETE CASCADE
 );
 
-CREATE TABLE sessions (
-    id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id      BIGINT UNSIGNED NOT NULL,
-    service_id   BIGINT UNSIGNED NOT NULL,
+CREATE TABLE IF NOT EXISTS sessions (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT NOT NULL,
+    service_id   INT NOT NULL,
     started_at   DATETIME        NOT NULL,
     ended_at     DATETIME        NULL,
     outcome      ENUM('SUCCESS', 'FAILURE', 'INTERRUPTED') NOT NULL,
