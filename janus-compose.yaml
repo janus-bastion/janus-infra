@@ -112,6 +112,14 @@ services:
     networks:
       - janus-prod-net
 
+  janus-core:
+    image: imtjanus/janus-core:latest
+    container_name: janus-core
+    restart: always
+    network_mode: host
+    depends_on:
+      - janus-mysql
+
 networks:
   janus-prod-net:
 
