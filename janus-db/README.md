@@ -86,22 +86,4 @@ The `.env` file allows customization of the configuration:
 cp .env.example .env
 ```
 
-**Available parameters:**
-```bash
-# Source database
-SOURCE_CONTAINER=janus-mysql
-SOURCE_USER=root
-SOURCE_PASSWORD=root
-SOURCE_DB=janus_db
-
-# Replica database
-TARGET_CONTAINER=janus-mysql-replica
-TARGET_USER=root
-TARGET_PASSWORD=replica_password
-TARGET_DB=janus_db
-
-# Synchronization interval (seconds)
-SYNC_INTERVAL=10
-```
-
 The replica database is automatically created during the first `setup` if it does not exist.
