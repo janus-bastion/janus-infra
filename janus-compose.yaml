@@ -121,8 +121,8 @@ services:
     tty: true
     depends_on:
       - janus-mysql
-    ports:
-      - "2222:22"
+    volumes:
+      - ./keys:/opt/janus/keys:ro
 
 networks:
   janus-prod-net:
