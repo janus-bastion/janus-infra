@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS hosts (
     UNIQUE KEY uniq_host (hostname, ip_addr)
 );
 
+INSERT INTO hosts (hostname, ip_addr, description)
+VALUES ('host_210', INET_ATON('172.16.0.210'), 'Test machine');
+
+
 CREATE TABLE IF NOT EXISTS services (
     id        INT AUTO_INCREMENT PRIMARY KEY,
     host_id   INT NOT NULL,
@@ -71,6 +75,13 @@ CREATE TABLE IF NOT EXISTS services (
     FOREIGN KEY (host_id)
         REFERENCES hosts(id)
         ON DELETE CASCADE
+);
+
+INSERT INTO services (host_id, proto, port)
+VALUES (
+    (SELECT id FROM hosts WHERE hostname='host_210'),
+    'SSH',
+    22
 );
 
 CREATE TABLE IF NOT EXISTS access_rules (
@@ -85,6 +96,14 @@ CREATE TABLE IF NOT EXISTS access_rules (
     FOREIGN KEY (service_id) 
         REFERENCES services(id) 
         ON DELETE CASCADE
+);
+
+INSERT IGNORE INTO access_rules (user_id, service_id, allow)
+VALUES (
+    (SELECT id FROM users    WHERE username='janusadmin'),
+    (SELECT id FROM services WHERE host_id=(SELECT id FROM hosts WHERE hostname='host_210') 
+                                 AND proto='SSH' AND port=22),
+    TRUE
 );
 
 CREATE TABLE IF NOT EXISTS credentials (
