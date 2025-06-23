@@ -121,6 +121,8 @@ services:
     tty: true
     depends_on:
       - janus-mysql
+    ports:
+      - "2222:22"
 
 networks:
   janus-prod-net:
