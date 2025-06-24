@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
     totp_code        VARCHAR(6)    DEFAULT NULL,
     totp_expires_at  DATETIME      DEFAULT NULL,
     is_admin         BOOLEAN       NOT NULL DEFAULT 0,
-    created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    password_changed_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 INSERT IGNORE INTO users (
