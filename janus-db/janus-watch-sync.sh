@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-SCRIPT="./janus-replication.sh"
+SCRIPT="$HOME/janus-workspace/janus-infra/janus-db/janus-replication.sh"
 INTERVAL=30
 
 while true; do
