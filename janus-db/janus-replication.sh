@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Janus Database Replication Manager
 # Script unique pour gérer la réplication de base de données Janus
@@ -6,6 +6,7 @@
 
 set -e
 
+# Configuration par défaut
 SOURCE_CONTAINER="${SOURCE_CONTAINER:-janus-mysql}"
 SOURCE_USER="${SOURCE_USER:-root}"
 SOURCE_PASSWORD="${SOURCE_PASSWORD:-root}"
@@ -19,30 +20,16 @@ TARGET_DB="${TARGET_DB:-janus_db}"
 SYNC_INTERVAL="${SYNC_INTERVAL:-10}"
 CHANGE_LOG_TABLE="replication_log"
 
+# Couleurs pour l'affichage
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
-msg() {
-    local level="$1"
-    local color msg
-    shift
-
-    case "$level" in
-        INFO) color=$BLUE ;;
-        WARN) color=$YELLOW ;;
-        SUCCESS) color=$GREEN ;;
-        ERROR) color=$RED ;;
-        *) color=$NC ;;
-    esac
-
-    printf "%b[%s]%b %s\n" "$color" "$level" "$NC" "$*"
-}
-
+# Help function
 show_help() {
-    msg INFO "Janus Database Replication Manager"
+    echo -e "${BLUE}Janus Database Replication Manager${NC}"
     echo ""
     echo "Usage: $0 <command> [options]"
     echo ""
@@ -62,25 +49,32 @@ show_help() {
     echo "  SYNC_INTERVAL      - Sync interval in seconds (default: 10)"
     echo ""
     echo "Examples:"
-    echo "  $0 setup"
-    echo "  $0 auto-sync"
-    echo "  $0 backup my_backup"
-    echo "  $0 status"
+    echo "  $0 setup                    # Complete configuration"
+    echo "  $0 auto-sync               # Start automatic synchronization"
+    echo "  $0 backup my_backup         # Create a backup"
+    echo "  $0 status                   # Check status"
 }
 
+# Function to execute MySQL commands
 mysql_exec() {
-    local container=$1 user=$2 password=$3 database=$4 query=$5
+    local container=$1
+    local user=$2
+    local password=$3
+    local database=$4
+    local query=$5
+    
     docker exec "$container" mysql -u "$user" -p"$password" "$database" -e "$query" 2>/dev/null
 }
 
+# Container verification function
 check_containers() {
     if ! docker ps | grep -q "$SOURCE_CONTAINER"; then
-        msg ERROR "Source container '$SOURCE_CONTAINER' not found"
+        echo -e "${RED}ERROR: Source container '$SOURCE_CONTAINER' not found${NC}"
         exit 1
     fi
-
+    
     if ! docker ps -a --format "table {{.Names}}" | grep -q "^$TARGET_CONTAINER$"; then
-        msg WARN "Creating target container '$TARGET_CONTAINER'..."
+        echo -e "${YELLOW}Creating target container '$TARGET_CONTAINER'...${NC}"
         docker run -d \
             --name "$TARGET_CONTAINER" \
             --network janus-infra_janus-prod-net \
@@ -88,36 +82,39 @@ check_containers() {
             -e MYSQL_DATABASE="$TARGET_DB" \
             -p 3307:3306 \
             mysql:latest
-
-        msg INFO "Waiting for MySQL startup..."
+        
+        echo -e "${YELLOW}Waiting for MySQL startup...${NC}"
         sleep 30
-
+        
         for i in {1..30}; do
             if docker exec "$TARGET_CONTAINER" mysql -u "$TARGET_USER" -p"$TARGET_PASSWORD" -e "SELECT 1;" > /dev/null 2>&1; then
                 break
             fi
-            msg INFO "Waiting for MySQL... ($i/30)"
+            echo "Waiting for MySQL... ($i/30)"
             sleep 2
         done
-
-        msg INFO "Initial synchronization of existing data..."
+        
+        # Complete initial synchronization of existing data
+        echo -e "${BLUE}Initial synchronization of existing data...${NC}"
         TEMP_INIT_FILE="/tmp/janus_initial_sync_$(date +%s).sql"
         docker exec "$SOURCE_CONTAINER" mysqldump -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" \
             --single-transaction --no-create-db \
             "$SOURCE_DB" > "$TEMP_INIT_FILE" 2>/dev/null
-
+        
         docker exec -i "$TARGET_CONTAINER" mysql -u "$TARGET_USER" -p"$TARGET_PASSWORD" "$TARGET_DB" < "$TEMP_INIT_FILE" 2>/dev/null
         rm -f "$TEMP_INIT_FILE"
-        msg SUCCESS "Initial synchronization completed"
+        echo -e "${GREEN}Initial synchronization completed${NC}"
     else
         docker start "$TARGET_CONTAINER" 2>/dev/null || true
         sleep 5
     fi
 }
 
+# Trigger installation function
 install_triggers() {
-    msg INFO "Installing triggers on all tables"
-
+    echo -e "${BLUE}Installing triggers on all tables${NC}"
+    
+    # Create log table
     mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "
     CREATE TABLE IF NOT EXISTS $CHANGE_LOG_TABLE (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -129,21 +126,24 @@ install_triggers() {
         INDEX idx_synced (synced),
         INDEX idx_timestamp (timestamp)
     );"
-
+    
+    # Get all tables
     TABLES=$(docker exec "$SOURCE_CONTAINER" mysql -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" "$SOURCE_DB" -e "SHOW TABLES;" 2>/dev/null | grep -v "Tables_in_$SOURCE_DB" | grep -v "$CHANGE_LOG_TABLE" || true)
-
-    msg INFO "Detected tables:"
+    
+    echo "Detected tables:"
     echo "$TABLES" | while read table; do
-        printf "   - %s\n" "$table"
+        echo "   - $table"
     done
-
+    
+    # Create triggers for each table
     echo "$TABLES" | while read table; do
         if [ -n "$table" ]; then
+            # Create triggers directly without using temporary files
             docker exec "$SOURCE_CONTAINER" mysql -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" "$SOURCE_DB" -e "
             DROP TRIGGER IF EXISTS ${table}_insert_trigger;
             DROP TRIGGER IF EXISTS ${table}_update_trigger;
             DROP TRIGGER IF EXISTS ${table}_delete_trigger;" 2>/dev/null || true
-
+            
             docker exec "$SOURCE_CONTAINER" mysql -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" "$SOURCE_DB" -e "
             DELIMITER $$
             CREATE TRIGGER ${table}_insert_trigger
@@ -153,8 +153,8 @@ install_triggers() {
                 INSERT INTO $CHANGE_LOG_TABLE (table_name, operation, record_id)
                 VALUES ('$table', 'INSERT', COALESCE(NEW.id, 0));
             END$$
-            DELIMITER ;" 2>/dev/null || msg WARN "INSERT trigger for $table ignored"
-
+            DELIMITER ;" 2>/dev/null || echo "INSERT trigger for $table ignored"
+            
             docker exec "$SOURCE_CONTAINER" mysql -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" "$SOURCE_DB" -e "
             DELIMITER $$
             CREATE TRIGGER ${table}_update_trigger
@@ -164,8 +164,8 @@ install_triggers() {
                 INSERT INTO $CHANGE_LOG_TABLE (table_name, operation, record_id)
                 VALUES ('$table', 'UPDATE', COALESCE(NEW.id, OLD.id, 0));
             END$$
-            DELIMITER ;" 2>/dev/null || msg WARN "UPDATE trigger for $table ignored"
-
+            DELIMITER ;" 2>/dev/null || echo "UPDATE trigger for $table ignored"
+            
             docker exec "$SOURCE_CONTAINER" mysql -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" "$SOURCE_DB" -e "
             DELIMITER $$
             CREATE TRIGGER ${table}_delete_trigger
@@ -175,167 +175,234 @@ install_triggers() {
                 INSERT INTO $CHANGE_LOG_TABLE (table_name, operation, record_id)
                 VALUES ('$table', 'DELETE', COALESCE(OLD.id, 0));
             END$$
-            DELIMITER ;" 2>/dev/null || msg WARN "DELETE trigger for $table ignored"
+            DELIMITER ;" 2>/dev/null || echo "DELETE trigger for $table ignored"
         fi
     done
-
-    msg SUCCESS "Triggers installed successfully"
+    
+    echo -e "${GREEN}Triggers installed successfully${NC}"
 }
 
+# Synchronization function
 sync_data() {
     local mode=${1:-"manual"}
-
+    
     if [ "$mode" = "auto" ]; then
-        msg INFO "Automatic synchronization started"
-        printf "Press Ctrl+C to stop\n"
-        trap 'msg INFO "Stopping synchronization..."; exit 0' INT TERM
+        echo -e "${BLUE}Automatic synchronization started${NC}"
+        echo "Press Ctrl+C to stop"
+        trap 'echo -e "\nStopping synchronization..."; exit 0' INT TERM
     fi
-
+    
     while true; do
-        [ "$mode" = "auto" ] && printf "Checking... %s\n" "$(date '+%H:%M:%S')"
-
+        if [ "$mode" = "auto" ]; then
+            echo "Checking... $(date '+%H:%M:%S')"
+        fi
+        
+        # Check for changes
         local changes
         changes=$(mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "SELECT COUNT(*) FROM $CHANGE_LOG_TABLE WHERE synced = FALSE;" | tail -1)
-
+        
         if [ "$changes" -gt 0 ]; then
-            msg WARN "$changes changes detected, synchronizing..."
+            echo -e "${YELLOW}$changes changes detected, synchronizing...${NC}"
+            
+            # Synchronization
             TEMP_FILE="/tmp/janus_sync_$(date +%s).sql"
-
             docker exec "$SOURCE_CONTAINER" mysqldump -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" \
                 --single-transaction --no-create-db \
                 --ignore-table="$SOURCE_DB.$CHANGE_LOG_TABLE" \
                 "$SOURCE_DB" > "$TEMP_FILE" 2>/dev/null
-
+            
             docker exec -i "$TARGET_CONTAINER" mysql -u "$TARGET_USER" -p"$TARGET_PASSWORD" "$TARGET_DB" < "$TEMP_FILE" 2>/dev/null
-
+            
             mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "UPDATE $CHANGE_LOG_TABLE SET synced = TRUE WHERE synced = FALSE;"
+            
             rm -f "$TEMP_FILE"
-
-            msg SUCCESS "Synchronization completed"
-
+            echo -e "${GREEN}Synchronization completed${NC}"
+            
+            # Verification
             local source_count target_count
             source_count=$(mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "SELECT COUNT(*) FROM users;" | tail -1)
             target_count=$(mysql_exec "$TARGET_CONTAINER" "$TARGET_USER" "$TARGET_PASSWORD" "$TARGET_DB" "SELECT COUNT(*) FROM users;" | tail -1)
-            printf "Users - Source: %s, Target: %s\n" "$source_count" "$target_count"
+            echo "Users - Source: $source_count, Target: $target_count"
         else
-            [ "$mode" = "auto" ] && printf "No changes\n" || msg SUCCESS "No changes to synchronize"
+            if [ "$mode" = "auto" ]; then
+                echo "No changes"
+            else
+                echo -e "${GREEN}No changes to synchronize${NC}"
+            fi
         fi
-
-        [ "$mode" != "auto" ] && break
+        
+        if [ "$mode" != "auto" ]; then
+            break
+        fi
+        
         sleep "$SYNC_INTERVAL"
     done
 }
 
+# Backup function
 backup_db() {
     local backup_name="${1:-janus_backup_$(date +%Y%m%d_%H%M%S)}"
     local backup_file="${backup_name}.sql"
-
-    msg INFO "Database backup"
-    printf "File: %s\n" "$backup_file"
-
+    
+    echo -e "${BLUE}Database backup${NC}"
+    echo "File: $backup_file"
+    
     docker exec "$SOURCE_CONTAINER" mysqldump -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" \
         --single-transaction --routines --triggers \
         "$SOURCE_DB" > "$backup_file" 2>/dev/null
-
+    
     gzip "$backup_file"
     local backup_size=$(du -h "${backup_file}.gz" | cut -f1)
-    msg SUCCESS "Backup completed: ${backup_file}.gz ($backup_size)"
+    echo -e "${GREEN}Backup completed: ${backup_file}.gz ($backup_size)${NC}"
 }
 
+# Restore function
 restore_db() {
     local backup_file="$1"
     local target_db="${2:-janus_db_restored}"
-
+    
     if [ -z "$backup_file" ]; then
-        msg ERROR "You must specify the backup file"
+        echo -e "${RED}ERROR: You must specify the backup file${NC}"
         return 1
     fi
-
+    
     if [ ! -f "$backup_file" ]; then
-        msg ERROR "File not found: $backup_file"
+        echo -e "${RED}ERROR: File not found: $backup_file${NC}"
         return 1
     fi
-
-    msg INFO "Database restoration"
-    printf "File: %s\n" "$backup_file"
-    printf "Target database: %s\n" "$target_db"
-
+    
+    echo -e "${BLUE}Database restoration${NC}"
+    echo "File: $backup_file"
+    echo "Target database: $target_db"
+    
     mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "" "DROP DATABASE IF EXISTS $target_db; CREATE DATABASE $target_db;"
-
+    
     if [[ "$backup_file" == *.gz ]]; then
         gunzip -c "$backup_file" | docker exec -i "$SOURCE_CONTAINER" mysql -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" "$target_db" 2>/dev/null
     else
         docker exec -i "$SOURCE_CONTAINER" mysql -u "$SOURCE_USER" -p"$SOURCE_PASSWORD" "$target_db" < "$backup_file" 2>/dev/null
     fi
-
-    msg SUCCESS "Restoration completed in '$target_db'"
+    
+    echo -e "${GREEN}Restoration completed in '$target_db'${NC}"
 }
 
+# Status function
 show_status() {
-    msg INFO "Janus Replication Status"
+    echo -e "${BLUE}Janus Replication Status${NC}"
     echo ""
-
-    printf "Containers:\n"
-    docker ps | grep -q "$SOURCE_CONTAINER" && printf "   OK Source: %s\n" "$SOURCE_CONTAINER" || printf "   ERROR Source: %s (stopped)\n" "$SOURCE_CONTAINER"
-    docker ps | grep -q "$TARGET_CONTAINER" && printf "   OK Target: %s\n" "$TARGET_CONTAINER" || {
-        printf "   ERROR Target: %s (stopped)\n" "$TARGET_CONTAINER"
+    
+    # Check containers
+    echo "Containers:"
+    if docker ps | grep -q "$SOURCE_CONTAINER"; then
+        echo -e "   OK Source: $SOURCE_CONTAINER"
+    else
+        echo -e "   ERROR Source: $SOURCE_CONTAINER (stopped)"
+    fi
+    
+    if docker ps | grep -q "$TARGET_CONTAINER"; then
+        echo -e "   OK Target: $TARGET_CONTAINER"
+    else
+        echo -e "   ERROR Target: $TARGET_CONTAINER (stopped)"
         return
-    }
-
+    fi
+    
+    # Count users
     local source_users target_users
     source_users=$(mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "SELECT COUNT(*) FROM users;" | tail -1)
     target_users=$(mysql_exec "$TARGET_CONTAINER" "$TARGET_USER" "$TARGET_PASSWORD" "$TARGET_DB" "SELECT COUNT(*) FROM users;" | tail -1)
-
+    
     echo ""
-    printf "Users:\n"
-    printf "   Source: %s\n" "$source_users"
-    printf "   Target: %s\n" "$target_users"
-
-    [ "$source_users" = "$target_users" ] && msg SUCCESS "OK Synchronized" || msg WARN "WARNING Difference detected"
-
+    echo "Users:"
+    echo "   Source: $source_users"
+    echo "   Target: $target_users"
+    
+    if [ "$source_users" = "$target_users" ]; then
+        echo -e "   ${GREEN}OK Synchronized${NC}"
+    else
+        echo -e "   ${YELLOW}WARNING Difference detected${NC}"
+    fi
+    
+    # Pending changes
     local pending_changes
     pending_changes=$(mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "SELECT COUNT(*) FROM $CHANGE_LOG_TABLE WHERE synced = FALSE;" 2>/dev/null | tail -1 || echo "0")
-
+    
     echo ""
-    printf "Pending changes: %s\n" "$pending_changes"
-
+    echo "Pending changes: $pending_changes"
+    
+    # Recent changes
     echo ""
-    printf "Recent changes:\n"
-    mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "SELECT CONCAT('  ', table_name, ' (', operation, ') - ', timestamp) FROM $CHANGE_LOG_TABLE ORDER BY timestamp DESC LIMIT 5;" 2>/dev/null || printf "   No changes recorded\n"
+    echo "Recent changes:"
+    mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "SELECT CONCAT('  ', table_name, ' (', operation, ') - ', timestamp) FROM $CHANGE_LOG_TABLE ORDER BY timestamp DESC LIMIT 5;" 2>/dev/null || echo "   No changes recorded"
 }
 
+# Cleanup function
 cleanup() {
-    msg INFO "Cleaning replication system"
-
+    echo -e "${BLUE}Cleaning replication system${NC}"
+    
+    # Remove all triggers
     local triggers
     triggers=$(mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = '$SOURCE_DB';" | tail -n +2)
-
+    
     if [ -n "$triggers" ]; then
         echo "$triggers" | while read trigger; do
-            [ -n "$trigger" ] && mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "DROP TRIGGER IF EXISTS \`$trigger\`;"
+            if [ -n "$trigger" ]; then
+                mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "DROP TRIGGER IF EXISTS \`$trigger\`;"
+            fi
         done
     fi
-
+    
+    # Remove log table
     mysql_exec "$SOURCE_CONTAINER" "$SOURCE_USER" "$SOURCE_PASSWORD" "$SOURCE_DB" "DROP TABLE IF EXISTS $CHANGE_LOG_TABLE;"
-    msg SUCCESS "Cleanup completed"
+    
+    echo -e "${GREEN}Cleanup completed${NC}"
 }
 
+# Main program
 case "${1:-}" in
     "setup")
-        msg INFO "Complete Janus replication configuration"
+        echo -e "${BLUE}Complete Janus replication configuration${NC}"
         check_containers
         install_triggers
         echo ""
-        msg SUCCESS "Configuration completed!"
-        printf "To start automatic synchronization:\n   $0 auto-sync\n"
+        echo -e "${GREEN}Configuration completed!${NC}"
+        echo "To start automatic synchronization:"
+        echo "   $0 auto-sync"
         ;;
-    "sync") check_containers; sync_data "manual" ;;
-    "auto-sync") check_containers; sync_data "auto" ;;
-    "backup") backup_db "$2" ;;
-    "restore") restore_db "$2" "$3" ;;
-    "status") show_status ;;
-    "cleanup") cleanup ;;
-    "help"|"-h"|"--help"|"") show_help ;;
-    *) msg ERROR "Unknown command: $1"; echo ""; show_help; exit 1 ;;
+    
+    "sync")
+        check_containers
+        sync_data "manual"
+        ;;
+    
+    "auto-sync")
+        check_containers
+        sync_data "auto"
+        ;;
+    
+    "backup")
+        backup_db "$2"
+        ;;
+    
+    "restore")
+        restore_db "$2" "$3"
+        ;;
+    
+    "status")
+        show_status
+        ;;
+    
+    "cleanup")
+        cleanup
+        ;;
+    
+    "help"|"-h"|"--help"|"")
+        show_help
+        ;;
+    
+    *)
+        echo -e "${RED}ERROR: Unknown command: $1${NC}"
+        echo ""
+        show_help
+        exit 1
+        ;;
 esac
-
