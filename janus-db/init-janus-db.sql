@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS hosts (
 );
 
 INSERT INTO hosts (hostname, ip_addr, description)
-VALUES ('host_210', INET_ATON('172.16.0.210'), 'Test machine');
+VALUES ('host_210', INET_ATON('192.168.43.59'), 'Test machine');
 
 
 CREATE TABLE IF NOT EXISTS services (
